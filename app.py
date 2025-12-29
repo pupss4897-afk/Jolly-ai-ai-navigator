@@ -12,26 +12,44 @@ st.markdown("""
     .stTextInput>div>div>input { background-color: #1a1c23; color: white; border: 1px solid #00f3ff; }
     .stButton>button { background-color: #00f3ff; color: black; font-weight: bold; border-radius: 10px; width: 100%; height: 3em; }
     .report-box { background: #1a1c23; padding: 25px; border-radius: 15px; border-left: 5px solid #00f3ff; line-height: 1.8; color: #eee; }
+    .status-text { color: #00f3ff; font-size: 0.9em; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🚀 綸綸老師專業AI：短影音成功導航儀")
 st.write("<p style='text-align: center; color: #888;'>全市場最強分析師：由 9 年實戰戰略驅動</p>", unsafe_allow_html=True)
 
-# 2. 自動從保險箱讀取 API Key
-try:
-    # 這裡會讀取你在 Streamlit Secrets 設定的 GEMINI_API_KEY
-    if "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
+# 2. 自動偵測並連接最強大腦
+@st.cache_resource
+def get_best_model(api_key):
+    try:
+        genai.configure(api_key=api_key.strip())
+        # 掃描此 Key 支援的所有型號
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # 【關鍵修正點】：改用 gemini-1.5-flash，這個型號最穩定，不容易報錯
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 優先順序：1.5-flash > 1.5-pro > gemini-pro
+        if any("gemini-1.5-flash" in m for m in available_models):
+            return "gemini-1.5-flash", "Gemini 1.5 Flash (最新高速大腦)"
+        elif any("gemini-1.5-pro" in m for m in available_models):
+            return "gemini-1.5-pro", "Gemini 1.5 Pro (旗艦大腦)"
+        else:
+            return "gemini-pro", "Gemini 1.0 Pro (穩定型大腦)"
+    except Exception as e:
+        return None, str(e)
+
+# 讀取保險箱中的 Key
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    model_id, model_info = get_best_model(api_key)
+    
+    if model_id:
+        st.sidebar.success(f"✅ 大腦連接成功：{model_info}")
+        model = genai.GenerativeModel(model_id)
     else:
-        st.error("❌ 找不到 API Key。請確保在 Streamlit 的 Secrets 中設定了 GEMINI_API_KEY")
+        st.error(f"❌ 大腦連接失敗：{model_info}")
         st.stop()
-except Exception as e:
-    st.error(f"❌ 系統初始化失敗：{e}")
+else:
+    st.error("❌ 找不到 API Key。請在 Streamlit Secrets 中設定 GEMINI_API_KEY")
     st.stop()
 
 # 3. 主界面
@@ -61,19 +79,14 @@ if st.button("開啟深度診斷"):
         #### 4. 【爆款標題改寫】
         給出 3 組更有攻擊力的『懲罰式反差標題』。
         
-        語氣要求：專業、犀利、直接點出病灶，不要說廢話。
+        語氣要求：專業、犀利、直接點出病灶，說話要像一位資深戰略總監。
         """
         
         with st.spinner("🧠 正在讀取九年心法，大腦運算中..."):
             try:
-                # 呼叫 AI 產生內容
                 response = model.generate_content(prompt)
-                
-                # 顯示報告
                 st.markdown("<div class='report-box'>", unsafe_allow_html=True)
                 st.markdown(response.text)
                 st.markdown("</div>", unsafe_allow_html=True)
-                
             except Exception as e:
                 st.error(f"分析時發生錯誤：{e}")
-                st.info("提示：如果持續出現 404，請檢查 API Key 是否正確或是否有開啟 Google AI Studio 的付費權限（雖然免費版通常可用）。")
